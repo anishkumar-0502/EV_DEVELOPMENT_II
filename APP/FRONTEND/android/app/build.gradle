@@ -1,0 +1,86 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'dev.flutter.flutter-gradle-plugin'
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
+android {
+    namespace = 'com.example.ev_app'
+    compileSdkVersion 34
+    ndkVersion = '23.1.7779620'
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        applicationId = 'com.example.ev_app'
+        minSdkVersion 21
+        targetSdkVersion 34
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        multiDexEnabled true
+        configurations.all {
+        resolutionStrategy { force 'androidx.work:work-runtime:2.6.0' }
+        }
+    }
+
+    // Define MAPS_API_KEY at the top level
+    def MAPS_API_KEY = "AIzaSyDezbZNhVuBMXMGUWqZTOtjegyNexKWosA"
+
+    buildTypes {
+        debug {
+            buildConfigField "String", "MAPS_API_KEY", "\"${MAPS_API_KEY}\""
+            resValue "string", "google_maps_key", MAPS_API_KEY
+        }
+        release {
+            buildConfigField "String", "MAPS_API_KEY", "\"${MAPS_API_KEY}\""
+            resValue "string", "google_maps_key", MAPS_API_KEY
+            signingConfig signingConfigs.debug
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+}
+
+flutter {
+    source = '../..'
+}
+
+dependencies {
+    implementation 'com.android.support:multidex:2.0.1'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.0"
+    implementation 'androidx.core:core-ktx:1.9.0'
+    implementation 'com.google.android.gms:play-services-maps:18.0.0'
+    implementation 'com.google.android.gms:play-services-location:21.0.0'
+}
