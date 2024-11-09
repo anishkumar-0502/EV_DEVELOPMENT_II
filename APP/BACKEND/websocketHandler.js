@@ -3,13 +3,14 @@ const { connectToDatabase } = require('./db');
 const {
     generateRandomTransactionId, SaveChargerStatus, updateTime, updateCurrentOrActiveUserToNull, handleChargingSession,
     getUsername, updateChargerDetails, checkChargerIdInDatabase, checkChargerTagId, checkAuthorization, calculateDifference,
-    UpdateInUse, getAutostop, captureMetervalues, autostop_unit, autostop_price, insertSocketGunConfig, NullTagIDInStatus
+    UpdateInUse, getAutostop, captureMetervalues, autostop_unit, autostop_price, NullTagIDInStatus,
+    getConnectorId
 } = require('./functions');
 const Chargercontrollers = require("./src/ChargingSession/controllers.js");
 
-const PING_INTERVAL = 60000; // 60 seconds ping interval
+//const PING_INTERVAL = 60000; // 60 seconds ping interval
 
-connectToDatabase();
+//connectToDatabase();
 
 const getUniqueIdentifierFromRequest = async (request, ws) => {
     const urlParts = request.url.split('/');
@@ -60,9 +61,16 @@ const getUniqueIdentifierFromRequest = async (request, ws) => {
     }
 };
 
-const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, ClientConnections, clients, OCPPResponseMap, meterValuesMap, sessionFlags, charging_states, startedChargingSet, chargingSessionID) => {
+const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, ClientConnections, clients, OCPPResponseMap, meterValuesMap, sessionFlags, charging_states, startedChargingSet, chargingSessionID, chargerStartTime, chargerStopTime) => {
     wss.on('connection', async (ws, req) => {
+        
         ws.isAlive = true;
+        if(ws.socket){
+            ws.socket.setNoDelay(true); // Disable Nagle's algorithm
+        }else{
+            console.log('ws.socket is undefined, could not able to disable nagles algorithm');
+        }
+
         const uniqueIdentifier = await getUniqueIdentifierFromRequest(req, ws); // Await here
         if (!uniqueIdentifier) {
             return; // Exit if no valid unique identifier is found
@@ -71,8 +79,8 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
         const clientIpAddress = req.connection.remoteAddress;
         let timeoutId;
         let GenerateChargingSessionID;
-        let StartTimestamp = null;
-        let StopTimestamp = null;
+        //let StartTimestamp = null;
+        //let StopTimestamp = null;
         let timestamp;
         let autoStopTimer; // Initialize a variable to hold the timeout reference
 
@@ -137,7 +145,7 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
                 logger.info(WS_MSG);
                 console.log(WS_MSG);
 
-                broadcastMessage(uniqueIdentifier, requestData, ws);
+                broadcastMessage(uniqueIdentifier, requestData, ws, WebSocket, ClientWss);
 
                 const currentDate = new Date();
                 const formattedDate = currentDate.toISOString();
@@ -229,18 +237,20 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
                             return errors;
                         }
                     
-                        function validateChargePointModel(model) {
-                            const errors = [];
-                            const pattern = /^(.*? - )([1-9][SG]){1,}$/;
+                        // function validateChargePointModel(model) {
+                        //     const errors = [];
+                        //     const pattern = /^(.*? - )([1-9][SG]){1,}$/;
                     
-                            if (!pattern.test(model)) {
-                                errors.push(`Invalid chargePointModel format: ${model}`);
-                            }
+                        //     if (!pattern.test(model)) {
+                        //         errors.push(`Invalid chargePointModel format: ${model}`);
+                        //     }
                     
-                            return errors;
-                        }
+                        //     return errors;
+                        // }
                     
-                        const errors = validate(data, schema).concat(validateChargePointModel(data.chargePointModel));
+                        // const errors = validate(data, schema).concat(validateChargePointModel(data.chargePointModel));
+
+                        const errors = validate(data, schema);
 
                         const sendTo =  wsConnections.get(uniqueIdentifier);
                         const response = [3, requestData[1], {
@@ -262,15 +272,15 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
                                 console.log(`ChargerID: ${uniqueIdentifier} - Updated charger details successfully`);
                                 logger.info(`ChargerID: ${uniqueIdentifier} - Updated charger details successfully`);
                     
-                                const insertSocketGun= await insertSocketGunConfig(uniqueIdentifier, data.chargePointModel);
-                                if (insertSocketGun) {
-                                    console.log(`ChargerID: ${uniqueIdentifier} - insertSocketGunConfig - Updated charger details successfully`);
-                                    logger.info(`ChargerID: ${uniqueIdentifier} - insertSocketGunConfig - Updated charger details successfully`);
+                                // const insertSocketGun= await insertSocketGunConfig(uniqueIdentifier, data.chargePointModel);
+                                // if (insertSocketGun) {
+                                //     console.log(`ChargerID: ${uniqueIdentifier} - insertSocketGunConfig - Updated charger details successfully`);
+                                //     logger.info(`ChargerID: ${uniqueIdentifier} - insertSocketGunConfig - Updated charger details successfully`);
                             
-                                    } else {
-                                        console.error(`ChargerID: ${uniqueIdentifier} - insertSocketGunConfig - Failed to update charger details`);
-                                        logger.error(`ChargerID: ${uniqueIdentifier} - insertSocketGunConfig -- Failed to update charger details`);
-                                    }
+                                //     } else {
+                                //         console.error(`ChargerID: ${uniqueIdentifier} - insertSocketGunConfig - Failed to update charger details`);
+                                //         logger.error(`ChargerID: ${uniqueIdentifier} - insertSocketGunConfig -- Failed to update charger details`);
+                                //     }
                             } else {
                                 console.error(`ChargerID: ${uniqueIdentifier} - Failed to update charger details`);
                                 logger.error(`ChargerID: ${uniqueIdentifier} - Failed to update charger details`);
@@ -433,18 +443,26 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
                             if (status == 'Charging' && !startedChargingSet.has(key)) {
                                 sessionFlags.set(key, 1);
                                 charging_states.set(key, true);
-                                StartTimestamp = timestamp;
+                                //StartTimestamp = timestamp;
+                                chargerStartTime.set(key, timestamp);
                                 startedChargingSet.add(key);
                                 GenerateChargingSessionID = generateRandomTransactionId();
                                 chargingSessionID.set(key, GenerateChargingSessionID);
                             }
 
-                            if ((status === 'SuspendedEV' || status === 'Faulted') && (charging_states.get(key) == true)) {
+                            if ((status === 'SuspendedEV' || status === 'Faulted' || status === 'Unavailable') && (charging_states.get(key) === true)) {
                                 sessionFlags.set(key, 1);
-                                StopTimestamp = timestamp;
+                                //StopTimestamp = timestamp;
+                                chargerStopTime.set(key, timestamp);
+                                //charging_states.set(key, false);
+                                startedChargingSet.delete(key);
+                                //deleteMeterValues(key);
+                            }
+
+                            if ((status === 'Finishing') && (charging_states.get(key) === true)) {
                                 charging_states.set(key, false);
                                 startedChargingSet.delete(key);
-                                deleteMeterValues(key);
+                                //deleteMeterValues(key);
                             }
                 
                         } else {
@@ -819,24 +837,30 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
                                 autostopSettings = meterValues.autostopSettings;
                             }
                     
+                            const processMeterValues = async (firstMeter, lastMeter, settings, identifier, connector) => {
+                                if (settings.isUnitChecked) {
+                                    await autostop_unit(firstMeter, lastMeter, settings, identifier, connector);
+                                } 
+                                if (settings.isPriceChecked) {
+                                    await autostop_price(firstMeter, lastMeter, settings, identifier, connector);
+                                }
+                            };
+                            
                             if (!meterValues.firstMeterValues && !meterValues.connectorId) {
                                 meterValues.connectorId = connectorId;
                                 meterValues.firstMeterValues = await captureMetervalues(Identifier, requestData, uniqueIdentifier, clientIpAddress, UniqueChargingSessionId, connectorId);
+                                meterValues.lastMeterValues = meterValues.firstMeterValues;
                                 console.log(`First MeterValues for ${uniqueIdentifier} for Connector ${connectorId}: ${meterValues.firstMeterValues}`);
-                                if (autostopSettings.isUnitChecked) {
-                                    await autostop_unit(meterValues.firstMeterValues, meterValues.lastMeterValues, autostopSettings, uniqueIdentifier, connectorId);
-                                } else if (autostopSettings.isPriceChecked) {
-                                    await autostop_price(meterValues.firstMeterValues, meterValues.lastMeterValues, autostopSettings, uniqueIdentifier, connectorId);
-                                }
+                                console.log(`Last MeterValues for ${uniqueIdentifier} for Connector ${connectorId}: ${meterValues.lastMeterValues}`);
+
+                                await processMeterValues(meterValues.firstMeterValues, meterValues.lastMeterValues, autostopSettings, uniqueIdentifier, connectorId);
                             } else {
                                 meterValues.lastMeterValues = await captureMetervalues(Identifier, requestData, uniqueIdentifier, clientIpAddress, UniqueChargingSessionId, connectorId);
                                 console.log(`Last MeterValues for ${uniqueIdentifier} for Connector ${connectorId}: ${meterValues.lastMeterValues}`);
-                                if (autostopSettings.isUnitChecked) {
-                                    await autostop_unit(meterValues.firstMeterValues, meterValues.lastMeterValues, autostopSettings, uniqueIdentifier, connectorId);
-                                } else if (autostopSettings.isPriceChecked) {
-                                    await autostop_price(meterValues.firstMeterValues, meterValues.lastMeterValues, autostopSettings, uniqueIdentifier, connectorId);
-                                }
+                            
+                                await processMeterValues(meterValues.firstMeterValues, meterValues.lastMeterValues, autostopSettings, uniqueIdentifier, connectorId);
                             }
+                            
                         } else {
                             console.error('Invalid MeterValues frame:', requestErrors);
                             response = [3, Identifier, { "errors": requestErrors }];
@@ -976,8 +1000,11 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
                             return errors;
                         }
                     
-                        const connectorId = requestData[3].connectorId; // Get the connector ID from the request
+                        //const connectorId = requestData[3].connectorId; // Get the connector ID from the request
                         const idTag = requestData[3].idTag;
+                        const transactionId = requestData[3].transactionId;
+
+                        const connectorId = await getConnectorId(uniqueIdentifier,transactionId);
                     
                         const timestamp = requestData[3].timestamp;
                         const sendTo = wsConnections.get(uniqueIdentifier);
@@ -1022,15 +1049,17 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
                         
                         if (charging_states.get(key) === true) {
                             sessionFlags.set(key, 1);
-                            StopTimestamp = timestamp;
-                            charging_states.set(key, false);
+                            // StopTimestamp = timestamp;
+                            chargerStopTime.set(key, timestamp);
+                            //charging_states.set(key, false);
                             startedChargingSet.delete(key);
                         }
                     
                         clearTimeout(autoStopTimer);
                     }
 
-                    if (sessionFlags.get(key) == 1) {
+                    if (sessionFlags.get(key) === 1) {
+                        sessionFlags.set(key, 0);
                         let unit;
                         let sessionPrice;
                         const meterValues = getMeterValues(key);
@@ -1042,16 +1071,22 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
                             console.log("StartMeterValues or LastMeterValues is not available.");
                         }
                         const user = await getUsername(uniqueIdentifier, connectorId);
-                        const startTime = StartTimestamp;
-                        const stopTime = StopTimestamp;
+                        // const startTime = StartTimestamp;
+                        const startTime = chargerStartTime.get(key);
+                        // const stopTime = StopTimestamp;
+                        const stopTime = chargerStopTime.get(key);
                         // Fetch the connector type from socket_gun_config
                         const socketGunConfig = await db.collection('socket_gun_config').findOne({ charger_id: uniqueIdentifier});
                         const connectorIdTypeField = `connector_${connectorId}_type`;
                         const connectorTypeValue = socketGunConfig[connectorIdTypeField];
 
-                        await handleChargingSession(uniqueIdentifier, connectorId, startTime, stopTime, unit, sessionPrice, user, chargingSessionID.get(key), connectorTypeValue);
+                        if(user){
+                            await handleChargingSession(uniqueIdentifier, connectorId, startTime, stopTime, unit, sessionPrice, user, chargingSessionID.get(key), connectorTypeValue);
+                        }else{
+                            console.log(`ChargerID ${uniqueIdentifier}: User is ${user}, so cant update the sesison price and commission.`);
+                        }
                 
-                        if (charging_states.get(key) == false) {
+                        if (charging_states.get(key) === false) {
                             const result = await updateCurrentOrActiveUserToNull(uniqueIdentifier, connectorId);
                             chargingSessionID.delete(key);
                             if (result === true) {
@@ -1063,11 +1098,17 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
                             console.log('End charging session is not updated - while stop only it will work');
                         }
                 
-                        StartTimestamp = null;
-                        StopTimestamp = null;
-                        sessionFlags.set(key, 0);
+                        // StartTimestamp = null;
+                        chargerStartTime.set(key, null);
+                        chargerStopTime.set(key, null);
+                        //StopTimestamp = null;
                     }
                 }
+            });
+
+            //Backpressure Handling
+            ws.on('drain', () => {
+                console.log('Socket buffer drained, ready to send more data');
             });
 
             ws.on('close', (code, reason) => {
@@ -1112,21 +1153,22 @@ const handleWebSocketConnection = (WebSocket, wss, ClientWss, wsConnections, Cli
 
         connectWebSocket();
     });
+};
 
-    const broadcastMessage = async (DeviceID, message, sender)  => {
-        const data = { DeviceID, message };
-        const jsonMessage = JSON.stringify(data);
+// send filtered messages to client devices
+const broadcastMessage = async (DeviceID, message, sender, WebSocket, ClientWss)  => {
+    const data = { DeviceID, message };
+    const jsonMessage = JSON.stringify(data);
 
-        ClientWss.clients.forEach(client => {
-            if (client !== sender && client.readyState === WebSocket.OPEN) {
-                client.send(jsonMessage, (error) => {
-                    if (error) {
-                        console.log(`Error sending message to client: ${error.message}`);
-                    }
-                });
-            }
-        });
-    };
+    ClientWss.clients.forEach(client => {
+        if (client !== sender && client.readyState === WebSocket.OPEN) {
+            client.send(jsonMessage, (error) => {
+                if (error) {
+                    console.log(`Error sending message to client: ${error.message}`);
+                }
+            });
+        }
+    });
 };
 
 module.exports = { handleWebSocketConnection };

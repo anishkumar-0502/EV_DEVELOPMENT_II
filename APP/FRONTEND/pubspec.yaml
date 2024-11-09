@@ -43,6 +43,7 @@ dependencies:
   flutter_typeahead: ^5.2.0
   geocoding: ^3.0.0
   async: ^2.10.0
+  flutter_spinkit: ^5.1.0
 
 dev_dependencies:
   flutter_test:

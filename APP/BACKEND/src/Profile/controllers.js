@@ -44,56 +44,68 @@ async function UpdateUserProfile(req, res, next) {
     try {
         // Validate the input
         if (!user_id || !username || !phone_no || !current_password) {
-            return res.status(400).json({ message: 'User ID, Username, Phone Number, and Current Password are required' });
+            return res.status(400).json({ error_message: 'User ID, Username, Phone Number, and Current Password are required' });
         }
 
         const db = await database.connectToDatabase();
         const usersCollection = db.collection("users");
 
         // Check if the user exists
-        const existingUser = await usersCollection.findOne({ user_id: user_id });
+        const existingUser = await usersCollection.findOne({ user_id: user_id, status: true });
         if (!existingUser) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ error_message: 'Your account has been deactivated. Please contact the admin.' });
+        }
+
+        if (phone_no.toString().length !== 10) {
+            return res.status(401).json({ error_message: 'Phone number should be 10 digits' });
         }
 
         // Validate the current password
-        const isCurrentPasswordValid = await bcrypt.compare(current_password, existingUser.password);
+        //const isCurrentPasswordValid = await bcrypt.compare(current_password, existingUser.password);
+        const isCurrentPasswordValid = (parseInt(current_password) === existingUser.password);
         if (!isCurrentPasswordValid) {
-            return res.status(401).json({ message: 'Current password is incorrect' });
+            return res.status(401).json({ error_message: 'Current password is incorrect' });
+        }
+
+        if(new_password === '' || !new_password){
+            const isPhoneChanged = (parseInt(phone_no) === existingUser.phone_no);
+            if (isPhoneChanged) {
+                return res.status(401).json({ error_message: 'No changes were made !' });
+            }
         }
 
         let updateFields = {
             username: username,
             phone_no: parseInt(phone_no),
             modified_by: username,
-            modified_date: new Date(),
+            modified_date: new Date()
         };
 
         // Only update the password if a new password is provided
         if (new_password) {
             // Convert new password to a string if it is not already
-            const newPasswordString = String(new_password);
+            //const newPasswordString = String(new_password);
 
             // Hash the new password
-            const hashedNewPassword = await bcrypt.hash(newPasswordString, 10);
+            //const hashedNewPassword = await bcrypt.hash(newPasswordString, 10);
 
             // Include the hashed new password in the update fields
-            updateFields.password = hashedNewPassword;
+            updateFields.password = parseInt(new_password);
 
             // Check if the new data is the same as the existing data
             const isSameData = (
                 existingUser.username === username &&
                 existingUser.phone_no === phone_no &&
-                await bcrypt.compare(newPasswordString, existingUser.password)
+                parseInt(new_password) === existingUser.password
             );
 
             if (isSameData) {
-                return res.status(400).json({ message: 'No changes found' });
+                return res.status(400).json({ error_message: 'No changes found' });
             }
         } else {
             // Check if the username and phone number are unchanged
             if (existingUser.username === username && existingUser.phone_no === phone_no) {
-                return res.status(400).json({ message: 'No changes found' });
+                return res.status(400).json({ error_message: 'No changes found' });
             }
         }
 
@@ -104,7 +116,7 @@ async function UpdateUserProfile(req, res, next) {
         );
 
         if (updateResult.matchedCount === 0) {
-            return res.status(500).json({ message: 'Failed to update user profile' });
+            return res.status(500).json({ error_message: 'Failed to update user profile' });
         }
 
         return res.status(200).json({ message: 'User profile updated successfully' });
@@ -112,7 +124,7 @@ async function UpdateUserProfile(req, res, next) {
     } catch (error) {
         console.error(error);
         logger.error(`Error updating user profile: ${error}`);
-        return res.status(500).json({ message: 'Internal Server Error' });
+        return res.status(500).json({ error_message: 'Internal Server Error' });
     }
 }
 

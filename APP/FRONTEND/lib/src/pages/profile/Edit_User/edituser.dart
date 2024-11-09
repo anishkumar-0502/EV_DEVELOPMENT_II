@@ -98,7 +98,7 @@ class _EditUserModalState extends State<EditUserModal> {
 
     try {
       var response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/profile/FetchUserProfile'),
+        Uri.parse('http://122.166.210.142:9098/profile/FetchUserProfile'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': userId}),
       );
@@ -141,7 +141,7 @@ class _EditUserModalState extends State<EditUserModal> {
 
     try {
       var response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/profile/UpdateUserProfile'),
+        Uri.parse('http://122.166.210.142:9098/profile/UpdateUserProfile'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'user_id': userId,

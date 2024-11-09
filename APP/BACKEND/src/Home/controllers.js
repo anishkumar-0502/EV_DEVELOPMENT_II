@@ -18,7 +18,7 @@ async function searchCharger(req, res) {
         //     return res.status(404).json({ message: errorMessage });
         // }
 
-        if (!chargerDetails || chargerDetails.charger_accessibility === !null) {
+        if (!chargerDetails || chargerDetails.charger_accessibility === null) {
             const errorMessage = 'Device ID not found !';
             return res.status(404).json({ message: errorMessage });
         }
@@ -204,8 +204,7 @@ async function getRecentSessionDetails(req, res) {
     try {
         const { user_id } = req.body;
         if (!user_id) {
-            const errorMessage = 'User ID is undefined!';
-            return res.status(401).json({ message: errorMessage });
+            return res.status(401).json({ message: 'User ID is undefined!' });
         }
 
         const db = await database.connectToDatabase();
@@ -218,8 +217,7 @@ async function getRecentSessionDetails(req, res) {
         // Fetch the user details to get the username
         const userRecord = await usersCollection.findOne({ user_id: user_id });
         if (!userRecord) {
-            const errorMessage = 'User not found';
-            return res.status(404).json({ message: errorMessage });
+            return res.status(404).json({ message: 'User not found' });
         }
 
         const username = userRecord.username;
@@ -228,8 +226,7 @@ async function getRecentSessionDetails(req, res) {
         const sessions = await collection.find({ user: username, stop_time: { $ne: null } }).sort({ stop_time: -1 }).toArray();
 
         if (!sessions || sessions.length === 0) {
-            const errorMessage = 'No Charger entries';
-            return res.status(404).json({ message: errorMessage });
+            return res.status(404).json({ message: 'No Charger entries' });
         }
 
         // Filter to get the most recent session per charger_id, connector_id, and connector_type
@@ -249,13 +246,37 @@ async function getRecentSessionDetails(req, res) {
             const details = await chargerDetailsCollection.findOne({ charger_id: session.charger_id });
             const status = await chargerStatusCollection.findOne({ charger_id: session.charger_id, connector_id: session.connector_id });
 
+            // Exclude sessions where the charger status is not true
+            if (details?.status !== true) {
+                return null; // Skip this session if the status is not true
+            }
+
             // Find the finance ID related to the charger
             const financeId = details?.finance_id;
-            // Fetch t  he unit price using the finance ID
             let unitPrice = null;
+
             if (financeId) {
+                // Fetch the finance record using the finance ID
                 const financeRecord = await financeDetailsCollection.findOne({ finance_id: financeId });
-                unitPrice = financeRecord ? financeRecord.eb_charges : null;
+
+                if (financeRecord) {
+                    // Calculate the total percentage from finance details
+                    const totalPercentage = [
+                        financeRecord.app_charges,
+                        financeRecord.other_charges,
+                        financeRecord.parking_charges,
+                        financeRecord.rent_charges,
+                        financeRecord.open_a_eb_charges,
+                        financeRecord.open_other_charges
+                    ].reduce((sum, charge) => sum + parseFloat(charge || 0), 0);
+
+                    // Calculate the unit price based on the finance record
+                    const pricePerUnit = parseFloat(financeRecord.eb_charges || 0);
+                    const totalPrice = pricePerUnit + (pricePerUnit * totalPercentage / 100);
+
+                    // Format the total price to 2 decimal places
+                    unitPrice = totalPrice.toFixed(2);
+                }
             }
 
             return {
@@ -265,8 +286,12 @@ async function getRecentSessionDetails(req, res) {
                 unit_price: unitPrice // Append the unit price to the session details
             };
         }));
-        // Return the most recent session data for each charger and connector
-        return res.status(200).json({ data: detailedSessions });
+
+        // Filter out any null values resulting from the status check
+        const filteredSessions = detailedSessions.filter(session => session !== null);
+
+        // Return the filtered session data
+        return res.status(200).json({ data: filteredSessions });
     } catch (error) {
         console.error(error);
         return res.status(500).send({ message: 'Internal Server Error' });
@@ -297,14 +322,32 @@ async function getAllChargersWithStatusAndPrice(req, res) {
         // Fetch all chargers where charger_accessibility is not null and the assigned_association_id matches the user's assigned_association
         if(userAssignedAssociation === null){
             allChargers = await chargerDetailsCollection.find({
-                charger_accessibility: { $ne: 2 },
-                assigned_association_id: { $ne: null }
+                charger_accessibility: 1,
+                assigned_association_id: { $ne: null },
+                status: true
             }).toArray();
         }else{
-            allChargers = await chargerDetailsCollection.find({
-                assigned_association_id: userAssignedAssociation,
-                charger_accessibility: { $in: [1, 2] } // This will match documents where charger_accessibility is either 1 or 2
+            // Fetch documents with charger_accessibility 1
+            const chargersAccessibilityOne = await chargerDetailsCollection.find({
+                //assigned_association_id: userAssignedAssociation,
+                charger_accessibility: 1, // Fetch all documents with charger_accessibility 1
+                assigned_association_id: { $ne: null },
+                status: true
             }).toArray();
+
+            // Fetch documents with charger_accessibility 2 only if assigned_association_id matches
+            const chargersAccessibilityTwo = await chargerDetailsCollection.find({
+                charger_accessibility: 2, // Fetch documents with charger_accessibility 2
+                status: true,
+                $or: [
+                    { assigned_association_id: userAssignedAssociation }, // If association matches
+                    { assigned_association_id: { $exists: false } } // or if association_id is not set
+                ]
+            }).toArray();
+
+            // Combine results
+            allChargers = [...chargersAccessibilityOne, ...chargersAccessibilityTwo];
+
         }
         
         // Fetch detailed information for each charger, including its status and unit price

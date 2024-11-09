@@ -45,7 +45,7 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
 
     try {
       var response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/wallet/getTransactionDetails'),
+        Uri.parse('http://122.166.210.142:9098/wallet/getTransactionDetails'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': username}),
       );

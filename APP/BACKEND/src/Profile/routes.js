@@ -19,6 +19,7 @@ router.post('/CheckLoginCredentials', async (req, res) => {
         res.status(500).json({ status: 'Failed', message: 'Failed to authenticate user' });
     }
 });
+
 // Route to logout and update users fields
 router.post('/LogoutCheck', async(req, res) => {
     const chargerID = req.body.ChargerID;
@@ -49,6 +50,7 @@ router.post('/LogoutCheck', async(req, res) => {
         res.status(200).json({ message: 'LoginCheck - error while update' });
     }
 });
+
 // Route to add a new user (Save into database)
 router.post('/RegisterNewUser', Auth.registerUser, (req, res) => {
     try {
@@ -67,16 +69,80 @@ router.post('/FetchUserProfile',controllers.FetchUserProfile, async (req, res ) 
 router.post('/UpdateUserProfile',controllers.UpdateUserProfile, async (req, res) => {
     try {
         res.status(200).json({ status: 'Success',message: 'User profile updated successfully' });
-    } catch (error) {x
+    } catch (error) {
         console.error('Error in UpdateUserProfile route:', error);
         res.status(500).json({ status: 'Failed', message: 'Failed to update user profile' });
     }
 });
+
 // Route to DeleteAccount
-router.post('DeleteAccount', controllers.DeActivateUser, (req, res) => {
-    res.status(200).json({ status: 'Success' ,  message: 'User deactivated successfully' });
+router.post('/DeleteAccount', controllers.DeActivateUser, (req, res) => {
+    res.status(200).json({ status: 'Success' ,  message: 'User deleted successfully' });
 });
 
+// Route to initiate forget password
+router.post('/initiateForgetPassword', async (req, res) => {
+    try {
+        const result = await Auth.intiateForgetPassword(req);
+
+        if (result.error) {
+            return res.status(result.status).json({ message: result.message });
+        }
+
+        res.status(200).json({ status: 'Success', data: result.message });
+    } catch (error) {
+        console.error('Error in CheckLoginCredentials route:', error);
+        res.status(500).json({ status: 'Failed', message: 'Failed to authenticate user' });
+    }
+});
+
+// Route to authenticate OTP
+router.post('/authenticateOTP', async (req, res) => {
+    try {
+        const result = await Auth.authenticateOTP(req);
+
+        if (result.error) {
+            return res.status(result.status).json({ message: result.message });
+        }
+
+        res.status(200).json({ status: 'Success', data: result.message });
+    } catch (error) {
+        console.error('Error in authenticate OTP route:', error);
+        res.status(500).json({ status: 'Failed', message: 'Failed to authenticate OTP' });
+    }
+});
+
+// Route to resetPassword
+router.post('/resetPassword', async (req, res) => {
+    try {
+        const result = await Auth.resetPassword(req);
+
+        if (result.error) {
+            return res.status(result.status).json({ message: result.message });
+        }
+
+        res.status(200).json({ status: 'Success', data: result.message });
+    } catch (error) {
+        console.error('Error in reset password route:', error);
+        res.status(500).json({ status: 'Failed', message: 'Failed to Reset Password' });
+    }
+});
+
+// Route to fetch RFID
+router.post('/fetchRFID', async (req, res) => {
+    try {
+        const result = await Auth.fetchRFID(req);
+
+        if (result.error) {
+            return res.status(result.status).json({ message: result.message });
+        }
+
+        res.status(200).json({ status: 'Success', data: result.message });
+    } catch (error) {
+        console.error('Error in fetch RFID route:', error);
+        res.status(500).json({ status: 'Failed', message: 'Failed to fetch RFID details' });
+    }
+});
 
 // Export the router
 module.exports = router;

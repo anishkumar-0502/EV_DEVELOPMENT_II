@@ -36,7 +36,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   // Sample recent locations
   List<Map<String, String>> recentLocations = [];
   List<Map<String, Object>> filteredLocations = [];
-  LatLng? _currentPosition;
   bool _isLoading = false; // Add this variable to manage loading state
   bool _isLoadingBolt = false; // Add this variable to manage loading state
   bool _isDialogShown = false;
@@ -72,7 +71,7 @@ Future<void> updateConnectorUser(String searchChargerID, int connectorId, int co
 
   try {
     final response = await http.post(
-      Uri.parse('http://122.166.210.142:4444/updateConnectorUser'),
+      Uri.parse('http://122.166.210.142:9098/updateConnectorUser'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'searchChargerID': searchChargerID,
@@ -126,7 +125,7 @@ Future<Map<String, dynamic>?> handleSearchRequest(String searchChargerID) async 
 
   try {
     final response = await http.post(
-      Uri.parse('http://122.166.210.142:4444/searchCharger'),
+      Uri.parse('http://122.166.210.142:9098/searchCharger'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'searchChargerID': searchChargerID,
@@ -363,7 +362,7 @@ void _searchChargerId(String chargerId) async {
 
   Future<List<Map<String, dynamic>>> fetchLocations(String query) async {
     const String apiKey =
-        'AIzaSyDezbZNhVuBMXMGUWqZTOtjegyNexKWosA'; // Replace with your actual API key
+        'AIzaSyDdBinCjuyocru7Lgi6YT3FZ1P6_xi0tco'; // Replace with your actual API key
     final String apiUrl =
         'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$query&key=$apiKey';
 
@@ -692,7 +691,7 @@ void _searchChargerId(String chargerId) async {
       }
 
       PermissionStatus permission = await Permission.location.status;
-      if (permission.isDenied) {
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         await _showPermissionDeniedDialog();
         return;
       } else if (permission.isPermanentlyDenied) {
@@ -708,7 +707,6 @@ void _searchChargerId(String chargerId) async {
       if (currentLocation != null) {
         // Update the current position
         setState(() {
-          _currentPosition = currentLocation;
         });
 
         // Call the _onLocationSelected function with the current location data

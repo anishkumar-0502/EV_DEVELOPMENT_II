@@ -49,7 +49,7 @@ class FooterState extends State<Footer> with SingleTickerProviderStateMixin {
           index: _currentIndex,
           // height: 42.8,
           height: 50.8,
-          items: List<Widget>.generate(4, (index) {
+          items: List<Widget>.generate(5, (index) {
             return AnimatedBuilder(
               animation: _animationController,
               builder: (context, child) {
@@ -73,9 +73,6 @@ class FooterState extends State<Footer> with SingleTickerProviderStateMixin {
           color: Colors.black,
           buttonBackgroundColor:const Color(0xFF1E1E1E),
           backgroundColor: Colors.black,
-          // color: const Color.fromARGB(0, 11, 97, 14),
-          // buttonBackgroundColor: Colors.black,
-          // backgroundColor: const Color.fromARGB(30, 76, 175, 79),
           animationCurve: Curves.easeInOut,
           animationDuration: const Duration(milliseconds: 500),
           onTap: (index) {
@@ -102,11 +99,14 @@ class FooterState extends State<Footer> with SingleTickerProviderStateMixin {
       case 2:
         return Icons.history;
       case 3:
+        return Icons.directions_car; // Icon for TripPage
+      case 4:
         return Icons.account_circle;
       default:
         return Icons.home;
     }
   }
+
 
   Color _getColor(int index) {
     return _currentIndex == index

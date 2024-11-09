@@ -63,7 +63,7 @@
 //   bool LocationEnabled = false;
 //   final PageController _pageController = PageController(
 //       viewportFraction: 0.85); // Page controller for scrolling cards
-//   static const String apiKey = 'AIzaSyDezbZNhVuBMXMGUWqZTOtjegyNexKWosA';
+//   static const String apiKey = 'AIzaSyDdBinCjuyocru7Lgi6YT3FZ1P6_xi0tco';
 //   Map<String, String> _addressCache = {};
 //   GoogleMapController? _mapController;
 //   List<String> chargerIdsList = [];
@@ -811,7 +811,7 @@
 
 //     try {
 //       final response = await http.post(
-//         Uri.parse('http://122.166.210.142:4444/searchCharger'),
+//         Uri.parse('http://122.166.210.142:9098/searchCharger'),
 //         headers: {'Content-Type': 'application/json'},
 //         body: json.encode({
 //           'searchChargerID': searchChargerID,
@@ -876,7 +876,7 @@
 
 //     try {
 //       final response = await http.post(
-//         Uri.parse('http://122.166.210.142:4444/updateConnectorUser'),
+//         Uri.parse('http://122.166.210.142:9098/updateConnectorUser'),
 //         headers: {'Content-Type': 'application/json'},
 //         body: json.encode({
 //           'searchChargerID': searchChargerID,
@@ -1020,7 +1020,7 @@
 
 //     try {
 //       final response = await http.post(
-//         Uri.parse('http://122.166.210.142:4444/getRecentSessionDetails'),
+//         Uri.parse('http://122.166.210.142:9098/getRecentSessionDetails'),
 //         headers: {'Content-Type': 'application/json'},
 //         body: json.encode({
 //           'user_id': widget.userId,
@@ -1064,7 +1064,7 @@
 
 //   try {
 //     final response = await http.post(
-//       Uri.parse('http://122.166.210.142:4444/getAllChargersWithStatusAndPrice'),
+//       Uri.parse('http://122.166.210.142:9098/getAllChargersWithStatusAndPrice'),
 //       headers: {'Content-Type': 'application/json'},
 //       body: json.encode({'user_id': widget.userId}),
 //     );

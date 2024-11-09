@@ -254,7 +254,7 @@ async function handleChargingSession(charger_id, connectorId,startTime, stopTime
     console.log(`TableCheck: ${JSON.stringify(existingDocument)}`);
 
     if (existingDocument) {
-        if (existingDocument.stop_time === null) {
+        if (existingDocument.stop_time === null && existingDocument.start_time != null) {
             const result = await collection.updateOne({ charger_id: charger_id,connector_id: connectorId, session_id: SessionID, stop_time: null }, {
                 $set: {
                     stop_time: stopTime !== null ? stopTime : undefined,
@@ -277,29 +277,31 @@ async function handleChargingSession(charger_id, connectorId,startTime, stopTime
                 console.log(`ChargerID ${charger_id}: Session/StopTimestamp not updated`);
                 logger.info(`ChargerID ${charger_id}: Session/StopTimestamp not updated`);
             }
+            return true;
         } else {
-            const newSession = {
-                charger_id: charger_id,
-                connector_id: connectorId,
-                connector_type: connectorTypeValue,
-                session_id: SessionID,
-                start_time: startTime !== null ? startTime : undefined,
-                stop_time: stopTime !== null ? stopTime : undefined,
-                unit_consummed: TotalUnitConsumed,
-                price: sessionPrice,
-                user: user,
-                created_date: new Date()
-            };
+            // const newSession = {
+            //     charger_id: charger_id,
+            //     connector_id: connectorId,
+            //     connector_type: connectorTypeValue,
+            //     session_id: SessionID,
+            //     start_time: startTime !== null ? startTime : undefined,
+            //     stop_time: stopTime !== null ? stopTime : undefined,
+            //     unit_consummed: TotalUnitConsumed,
+            //     price: sessionPrice,
+            //     user: user,
+            //     created_date: new Date()
+            // };
 
-            const result = await collection.insertOne(newSession);
+            // const result = await collection.insertOne(newSession);
 
-            if (result.acknowledged === true) {
-                console.log(`ChargerID ${charger_id}: Session/StartTimestamp inserted`);
-                logger.info(`ChargerID ${charger_id}: Session/StartTimestamp inserted`);
-            } else {
-                console.log(`ChargerID ${charger_id}: Session/StartTimestamp not inserted`);
-                logger.info(`ChargerID ${charger_id}: Session/StartTimestamp not inserted`);
-            }
+            // if (result.acknowledged === true) {
+            //     console.log(`ChargerID ${charger_id}: Session/StartTimestamp inserted`);
+            //     logger.info(`ChargerID ${charger_id}: Session/StartTimestamp inserted`);
+            // } else {
+            //     console.log(`ChargerID ${charger_id}: Session/StartTimestamp not inserted`);
+            //     logger.info(`ChargerID ${charger_id}: Session/StartTimestamp not inserted`);
+            // }
+            console.error(`ChargerID ${charger_id}: Session/StartTimestamp is current document exist but start/stop time not updated properly.`);
         }
     } else {
         // ChargerID is not in device_session_details table, insert a new document
@@ -331,6 +333,7 @@ async function handleChargingSession(charger_id, connectorId,startTime, stopTime
                 console.log(`ChargerID ${charger_id}: Please add the chargerID in the database!`);
                 logger.info(`ChargerID ${charger_id}: Please add the chargerID in the database!`);
             }
+            return true;
         } catch (error) {
             console.error(`Error querying device_session_details: ${error.message}`);
         }
@@ -529,9 +532,6 @@ const NullTagIDInStatus = async (charger_id, connector_id) =>{
     }
 }
 
-
-
-
 // async function checkAuthorization(charger_id, idTag) {
 //     try {
 //         const db = await connectToDatabase();
@@ -601,33 +601,42 @@ const NullTagIDInStatus = async (charger_id, connector_id) =>{
 //     }
 // }
 
-
-
 async function checkAuthorization(charger_id, idTag) {
     try {
         const db = await connectToDatabase();
         const chargerDetailsCollection = db.collection('charger_details');
         const tagIdCollection = db.collection('tag_id');
+        const userCollection = db.collection('users');
+        let connectorId = null;
+        let tagIdDetails;
+        let expiryDate;
+        let currentDate = new Date();
+        let userDetails;
+
+        expiryDate = new Date();
+        expiryDate.setDate(currentDate.getDate() + 1); // Add one day to the expiry date
 
         // Fetch charger details, including the chargePointModel
-        const chargerDetails = await chargerDetailsCollection.findOne(
-            { charger_id },
-            { projection: { model: 1 } }
-        );
+        const chargerDetails = await chargerDetailsCollection.findOne({ charger_id });
         if (!chargerDetails || !chargerDetails.model) {
             return { status: "Invalid" };
         }
 
+        if(chargerDetails.status === false){
+            return { status: "Blocked", expiryDate: expiryDate.toISOString()};
+        }
+
         // Dynamically determine the number of connectors based on the chargePointModel
-        const connectors = chargerDetails.model.split('- ')[1];
-        const totalConnectors = Math.ceil(connectors.length / 2);
+        // const connectors = chargerDetails.model.split('- ')[1];
+        // const totalConnectors = Math.ceil(connectors.length / 2);
+        const totalConnectors = chargerDetails.gun_connector + chargerDetails.socket_count;
 
         // Dynamically create the projection fields based on the number of connectors
         let projection = { charger_id: 1 };
         for (let i = 1; i <= totalConnectors; i++) {
             projection[`current_or_active_user_for_connector_${i}`] = 1;
             projection[`tag_id_for_connector_${i}`] = 1;
-            // projection[`tag_id_for_connector_${i}_in_use`] = 1;
+            projection[`tag_id_for_connector_${i}_in_use`] = 1;
         }
         
         // Fetch charger details with dynamically generated projection
@@ -639,17 +648,20 @@ async function checkAuthorization(charger_id, idTag) {
             return { status: "Invalid" };
         }
 
+        let currentUserActive = [];
         // Identify the connector associated with the provided tag_id
-        let connectorId = null;
         for (let i = 1; i <= totalConnectors; i++) {
+            const currentUserValue = chargerDetailsWithConnectors[`current_or_active_user_for_connector_${i}`];
+            const tagIDInUse = chargerDetailsWithConnectors[`tag_id_for_connector_${i}_in_use`];
+
+            if(currentUserValue !== null && tagIDInUse === false){
+                // Fetch the current active user for this connector
+                currentUserActive.push(currentUserValue); 
+            }
             if (chargerDetailsWithConnectors[`tag_id_for_connector_${i}`] === idTag) {
-                connectorId = i;
+                connectorId = i;        
                 break;
             }
-        }
-
-        if (!connectorId) {
-            connectorId = 1;
         }
 
         // Check if the tag_id_for_connector_{id} does not match the provided idTag
@@ -659,18 +671,48 @@ async function checkAuthorization(charger_id, idTag) {
             }
         }
 
-        // Fetch tag_id details from the separate collection
-        let tagIdDetails = await tagIdCollection.findOne({ tag_id: idTag });
+        if (connectorId) {
+            return { status: "Accepted", expiryDate: expiryDate.toISOString() , connectorId};
+        }else{
+            // Fetch tag_id details from the separate collection
+            tagIdDetails = await tagIdCollection.findOne({ tag_id: idTag, status: true });
 
-        let expiryDate;
-        let currentDate = new Date();
-
-        if(!tagIdDetails){
-            expiryDate = new Date();
-            expiryDate.setDate(currentDate.getDate() + 1); // Add one day to the expiry date
-            tagIdDetails = { status: true};
-        }else if(tagIdDetails){
-            expiryDate = new Date(tagIdDetails.tag_id_expiry_date);
+            if(!tagIdDetails){
+                console.error('Tag Id is not found or Deactivated !');
+                tagIdDetails = { status: false};
+            }else if(tagIdDetails){
+                if (tagIdDetails.tag_id_assigned === true) {
+                    // Fetch wallet balance to check min balance
+                    userDetails = await userCollection.findOne({ tag_id: tagIdDetails.id });
+                
+                    if (currentUserActive.length > 0 && !currentUserActive.includes(userDetails.username)) {
+                        return { status: "Invalid", expiryDate: expiryDate.toISOString(), connectorId };
+                    } else {
+                        // Check wallet balance
+                        if (userDetails.wallet_bal >= 100) {
+                            // Check if the assigned association matches
+                            if (chargerDetails.assigned_association_id === tagIdDetails.association_id) {
+                                expiryDate = new Date(tagIdDetails.tag_id_expiry_date);
+                            } else {
+                                // Check if the charger is public
+                                if (chargerDetails.charger_accessibility === 1) {
+                                    expiryDate = new Date(tagIdDetails.tag_id_expiry_date);
+                                } else {
+                                    console.error(`Charger ID - ${charger_id} Access Denied - This charger is private!`);
+                                    tagIdDetails = { status: false };
+                                }
+                            }
+                        } else {
+                            console.error('Wallet balance is below 100, please recharge to start the charger!');
+                            tagIdDetails = { status: false };
+                        }
+                    }
+                } else {
+                    console.error('Tag ID is not assigned, please assign to start the charger!');
+                    tagIdDetails = { status: false };
+                }
+                
+            }
         }
 
         // Check various conditions based on the tag_id details
@@ -693,9 +735,9 @@ async function calculateDifference(startValues, lastValues,uniqueIdentifier) {
     const startEnergy = startValues || 0;
     const lastEnergy = lastValues || 0;
     console.log(startEnergy, lastEnergy);
-    const differ = lastEnergy - startEnergy;
+    const differ = parseFloat(lastEnergy - startEnergy);
     // let calculatedUnit = parseFloat(differ / 1000).toFixed(3);
-    let calculatedUnit = differ;
+    let calculatedUnit = differ.toFixed(3);
     let unit;
     if (calculatedUnit === null || isNaN(parseFloat(calculatedUnit))) {
         unit = 0;
@@ -800,10 +842,6 @@ async function getAutostop(user){
 
 
 async function captureMetervalues(Identifier, requestData, uniqueIdentifier, clientIpAddress, UniqueChargingsessionId, connectorId) {
-    const sendTo = wsConnections.get(uniqueIdentifier);
-    const response = [3, Identifier, {}];
-    sendTo.send(JSON.stringify(response));
-
     let measurand;
     let value;
     let EnergyValue;
@@ -842,7 +880,8 @@ async function autostop_unit(firstMeterValues,lastMeterValues,autostopSettings,u
     const lastEnergy = lastMeterValues || 0;
     
     const result = lastEnergy - startEnergy;
-    let calculatedUnit = parseFloat(result / 1000).toFixed(3);
+    // let calculatedUnit = parseFloat(result / 1000).toFixed(3);
+    let calculatedUnit = parseFloat(result).toFixed(3);
 
     console.dir(autostopSettings);
     // console.log(`${autostopSettings.unit_value},${calculatedUnit}`);
@@ -954,60 +993,73 @@ async function UpdateCommissionToWallet(sessionPrice, uniqueIdentifier) {
 }
 
 async function updateWallet(collection, id, amount, type) {
-    const walletField = `${type}_wallet`;
-    const numericAmount = parseFloat(amount.toFixed(2));
+    try {
+        const walletField = `${type}_wallet`;
+        const numericAmount = parseFloat(amount.toFixed(3));
 
-    const updateResult = await collection.updateOne(
-        { [`${type}_id`]: id },
-        { $inc: { [walletField]: numericAmount } }
-    );
+        // Retrieve the current wallet value
+        const getWallet = await collection.findOne({ [`${type}_id`]: id });
 
-    if (updateResult.modifiedCount > 0) {
-        console.log(`${type} wallet updated successfully for ID: ${id}. Amount: ${numericAmount}`);
-        return true;
-    } else {
-        console.log(`Failed to update ${type} wallet for ID: ${id}`);
-        return false;
+        const currentWallet = parseFloat(getWallet[walletField]) || 0;
+        const updatedWallet = parseFloat((currentWallet + numericAmount).toFixed(3));
+
+        // Check to ensure the wallet doesn't go negative
+        if (updatedWallet < 0) {
+            console.log(`Cannot update ${type} wallet for ID: ${id}. The resulting balance would be negative.`);
+            return false;
+        }
+
+        // Update the wallet with the new value
+        const updateResult = await collection.updateOne(
+            { [`${type}_id`]: id },
+            { $set: { [walletField]: updatedWallet } }
+        );
+
+        if (updateResult.modifiedCount > 0) {
+            console.log(`${type} wallet updated successfully for ID: ${id}. New Amount: ${updatedWallet}`);
+            return true;
+        } else {
+            console.log(`Failed to update ${type} wallet for ID: ${id}. No changes were made.`);
+            return false;
+        }
+    } catch (error) {
+        console.error(`Error updating ${type} wallet for ID: ${id}: ${error.message}`);
+        throw new Error(`Unable to update ${type} wallet for ID: ${id}`);
     }
 }
 
-
-
 async function autostop_price(firstMeterValues, lastMeterValues, autostopSettings, uniqueIdentifier, connectorId) {
-    const startEnergy = firstMeterValues || 0;
-    const lastEnergy = lastMeterValues || 0;
-
-    // Calculate the energy consumed in kWh
-    const result = lastEnergy - startEnergy;
-    const calculatedUnit = parseFloat(result / 1000).toFixed(3);
-    const unit = isNaN(calculatedUnit) ? 0 : calculatedUnit;
-
-
     // Calculate the session price
     try {
+        const startEnergy = firstMeterValues || 0;
+        const lastEnergy = lastMeterValues || 0;
+    
+        // Calculate the energy consumed in kWh
+        let result = lastEnergy - startEnergy;
+        result = result < 0 ? 0 : result;
+
+        // const calculatedUnit = parseFloat(result / 1000).toFixed(3);
+        const calculatedUnit = parseFloat(result).toFixed(3);
+        const unit = isNaN(calculatedUnit) ? 0 : calculatedUnit;
+        console.log(`Total unit consummed: ${result} = ${lastEnergy}(last energy) - ${startEnergy}(start energy)`);
+
         const sessionPrice = await calculatePrice(unit, uniqueIdentifier);
         const formattedSessionPrice = isNaN(sessionPrice) || sessionPrice === 'NaN' ? 0 : parseFloat(sessionPrice).toFixed(2);
         console.log(`formattedPrice:`, formattedSessionPrice);
-
-        // Update commission to wallet
-        const commissionUpdateResult = await UpdateCommissionToWallet(formattedSessionPrice, uniqueIdentifier);
-        if(commissionUpdateResult){
-            console.log('Commission updated to wallet successfully');
-        }else{
-            console.log('Commission failed to update');
-        }
 
         // Check if the auto stop conditions are met
         if (autostopSettings.price_value && autostopSettings.isPriceChecked === true) {
             if (autostopSettings.price_value <= formattedSessionPrice) {
                 console.log(`Charger ${uniqueIdentifier} stop initiated - auto stop price`);
-                const result = await chargerStopCall(uniqueIdentifier, connectorId);
+                const result = await Chargercontrollers.chargerStopCall(uniqueIdentifier, connectorId);
                 if (result === true) {
                     console.log(`AutoStop price: Charger Stopped!`);
                 } else {
                     console.log(`Error: ${result}`);
                 }
             }
+        }else{
+            console.log(`Charger ${uniqueIdentifier} still price is calculating !`);
         }
     } catch (error) {
         console.log('Failed to calculate session price:', error);
@@ -1148,10 +1200,37 @@ const insertSocketGunConfig = async (uniqueIdentifier, chargePointModel) => {
     }
 };
 
+async function getConnectorId(uniqueIdentifier, transactionId) {
+    try {
+        const db = await database.connectToDatabase();
+        const document = await db.collection('charger_details').findOne({ charger_id: uniqueIdentifier });
 
+        // Check if the document exists
+        if (!document) {
+            throw new Error('Charger not found');
+        }
 
+        // Find the key that matches the transactionId
+        const keyName = Object.keys(document).find(key => document[key] === transactionId);
 
+        if (!keyName) {
+            throw new Error('Transaction not found');
+        }
 
+        // Extract the last number from the key name
+        const lastNumber = keyName.match(/(\d+)$/);
+
+        if (!lastNumber) {
+            throw new Error('No number found in the key name');
+        }
+
+        return lastNumber[0]; // Return the last number as a string
+
+    } catch (error) {
+        console.error(`Get connector ID error in stop transaction: ${error}`);
+        throw error; // Re-throw the error for handling by the caller
+    }
+}
 
 module.exports = {  savePaymentDetails, 
                     getIpAndupdateUser, 
@@ -1173,5 +1252,6 @@ module.exports = {  savePaymentDetails,
                     autostop_unit,
                     autostop_price,
                     insertSocketGunConfig,
-                    NullTagIDInStatus
+                    NullTagIDInStatus,
+                    getConnectorId
                 };

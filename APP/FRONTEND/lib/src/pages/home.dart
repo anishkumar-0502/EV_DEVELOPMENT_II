@@ -9,6 +9,7 @@ import 'profile/profile.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart'; // Import the foreground task package
 import 'package:flutter/services.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import './Trip/trip.dart'; // Import TripPage
 
 class HomePage extends StatefulWidget {
   final String username;
@@ -191,6 +192,7 @@ class _HomePageState extends State<HomePage> {
       HomeContent(username: widget.username, userId: widget.userId, email: widget.email, selectedLocation: widget.selectedLocation),
       WalletPage(username: widget.username, userId: widget.userId, email: widget.email ),
       HistoryPage(username: widget.username, userId: widget.userId),
+      TripPage(username: widget.username, userId: widget.userId, email: widget.email, startingPoint: '', destination: '', ),
       ProfilePage(username: widget.username, userId: widget.userId, email: widget.email),
     ];
 

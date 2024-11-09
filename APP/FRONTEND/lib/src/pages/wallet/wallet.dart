@@ -84,7 +84,7 @@ class _WalletPageState extends State<WalletPage> {
 
     try {
       var response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/wallet/FetchWalletBalance'),
+        Uri.parse('http://122.166.210.142:9098/wallet/FetchWalletBalance'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': userId}),
       );
@@ -121,7 +121,7 @@ class _WalletPageState extends State<WalletPage> {
 
     try {
       var response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/wallet/getTransactionDetails'),
+        Uri.parse('http://122.166.210.142:9098/wallet/getTransactionDetails'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': username}),
       );
@@ -160,7 +160,7 @@ class _WalletPageState extends State<WalletPage> {
 
     try {
       var response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/wallet/createOrder'),
+        Uri.parse('http://122.166.210.142:9098/wallet/createOrder'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'amount': amount, 'currency': currency , 'userId' : user_Id }),
       );
@@ -253,7 +253,7 @@ class _WalletPageState extends State<WalletPage> {
       };
 
       var output = await http.post(
-        Uri.parse('http://122.166.210.142:4444/wallet/savePayments'),
+        Uri.parse('http://122.166.210.142:9098/wallet/savePayments'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode(result),
       );

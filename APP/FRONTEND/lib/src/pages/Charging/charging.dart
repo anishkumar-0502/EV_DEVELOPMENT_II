@@ -260,7 +260,7 @@ Widget _buildLoadingIndicator() {
   Future<void> endChargingSession(String chargerID, int? connectorId) async {
     try {
       final response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/charging/endChargingSession'),
+        Uri.parse('http://122.166.210.142:9098/charging/endChargingSession'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'charger_id': chargerID, 'connector_id': connectorId}),
       );
@@ -286,7 +286,7 @@ Widget _buildLoadingIndicator() {
     // Introduce a 3-second delay before sending the request
     await Future.delayed(const Duration(seconds: 4));
 
-      var url = Uri.parse('http://122.166.210.142:4444/charging/getUpdatedCharingDetails');
+      var url = Uri.parse('http://122.166.210.142:9098/charging/getUpdatedCharingDetails');
       var body = {
         'chargerID': chargerID,
         'user': username,
@@ -486,7 +486,7 @@ Widget _buildLoadingIndicator() {
   Future<void> fetchLastStatus(String chargerID, int? connectorId) async {
     try {
       final response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/charging/FetchLaststatus'),
+        Uri.parse('http://122.166.210.142:9098/charging/FetchLaststatus'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'id': chargerID, 'connector_id': connectorId, 'connector_type': widget.connector_type}),
       );
@@ -823,8 +823,8 @@ void RcdMsg(Map<String, dynamic> parsedMessage) async {
 
   void initializeWebSocket() {
     channel = WebSocketChannel.connect(
-      // Uri.parse('ws://122.166.210.142:8566'),
-      Uri.parse('ws://122.166.210.142:7002'),
+      Uri.parse('ws://122.166.210.142:8566'),
+      // Uri.parse('ws://122.166.210.142:7002'),
         // Uri.parse('ws://192.168.1.7:7050'),
 
     );
@@ -945,7 +945,7 @@ void toggleBatteryScreen() {
     });
 
       final response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/charging/start'),
+        Uri.parse('http://122.166.210.142:9098/charging/start'),
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',
         },
@@ -997,7 +997,7 @@ void handleStopTransaction() async {
     });
 
     final response = await http.post(
-      Uri.parse('http://122.166.210.142:4444/charging/stop'),
+      Uri.parse('http://122.166.210.142:9098/charging/stop'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
       },

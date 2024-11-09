@@ -136,8 +136,30 @@ async function endChargingSession(req, res) {
             return res.status(404).json({ message: errorMessage });
         }
 
+        if (chargerStatus.charger_status === 'Finishing') {
+            const connectorField = `current_or_active_user_for_connector_${connector_id}`;
+            const chargerDetails = await chargerDetailsCollection.findOne({ charger_id });
+            let result;
+
+            if (chargerDetails[connectorField] === null) {
+                return res.status(200).json({ status: "Success", message: 'The charging session is already ended.' });
+            }else if(chargerDetails[connectorField] !== null){
+                result = await chargerDetailsCollection.updateOne(
+                    { charger_id }, // Match by charger_id
+                    { $set: { [connectorField]: null } }
+                );
+
+                if (result.modifiedCount === 0) {
+                    const errorMessage = 'Failed to update the charging session';
+                    return res.status(404).json({ message: errorMessage });
+                }
+
+                return res.status(200).json({ status: "Success", message: 'End Charging session updated successfully.' });
+            }
+        }
+
         // Check if the status is one of the acceptable statuses
-        if (['Available', 'Faulted', 'Finishing', 'Unavailable'].includes(chargerStatus.charger_status)) {
+        if (['Available', 'Faulted', 'Unavailable'].includes(chargerStatus.charger_status)) {
             const connectorField = `current_or_active_user_for_connector_${connector_id}`;
 
             // Check the current value of the connector field

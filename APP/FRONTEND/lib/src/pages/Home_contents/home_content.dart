@@ -55,14 +55,13 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
   MarkerId? _previousMarkerId; // To track the previously selected marker
   StreamSubscription<Position>? _positionStreamSubscription;
   bool _isFetchingLocation = false; // Ensure initialization
-  LatLng? _previousPosition;
   bool isChargerAvailable = false; // Flag to track if any charger is available
   bool _isCheckingPermission =
       false; // Flag to prevent repeated permission checks
   bool LocationEnabled = false;
   final PageController _pageController = PageController(
       viewportFraction: 0.85); // Page controller for scrolling cards
-  static const String apiKey = 'AIzaSyDezbZNhVuBMXMGUWqZTOtjegyNexKWosA';
+  static const String apiKey = 'AIzaSyDdBinCjuyocru7Lgi6YT3FZ1P6_xi0tco';
   Map<String, String> _addressCache = {};
   GoogleMapController? _mapController;
   List<String> chargerIdsList = [];
@@ -76,6 +75,7 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
     _currentSelectedLocation = widget.selectedLocation;
     _checkLocationPermission(); // Check permissions on initialization
     // Prioritize moving to the selected location
+    _getCurrentLocation();
     _updateMarkers();
     activeFilter = 'All Chargers';
     fetchAllChargers();
@@ -135,11 +135,6 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
       _isFetchingLocation = true;
     });
 
-    // if (_currentSelectedLocation != null ){
-    //   setState(() {
-    //     _currentSelectedLocation = null;
-    //   });
-    // }
 
     try {
       // Ensure location services are enabled and permission is granted before fetching location
@@ -150,13 +145,10 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
       }
 
       PermissionStatus permission = await Permission.location.status;
-      if (permission.isDenied) {
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         await _showPermissionDeniedDialog();
         return;
-      } else if (permission.isPermanentlyDenied) {
-        await _showPermanentlyDeniedDialog();
-        return;
-      }
+      } 
 
       // Fetch the current location if permission is granted
       LatLng? currentLocation =
@@ -168,6 +160,7 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
         setState(() {
           _currentPosition = currentLocation;
         });
+      // print("_onMapCreated currentLocation mapController $mapController");
 
         // Smoothly animate the camera to the new position if the mapController is available
         if (mapController != null) {
@@ -199,229 +192,6 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
       });
     }
   }
-
-// // Define the method to check and request location permissions AND
-//   Future<void> _checkLocationPermission() async {
-//     if (_isCheckingPermission) return; // Prevent multiple permission checks
-
-//     _isCheckingPermission = true;
-
-//     // Load the saved flag from SharedPreferences
-//     SharedPreferences prefs = await SharedPreferences.getInstance();
-//     bool locationPromptClosed = prefs.getBool('LocationPromptClosed') ?? false;
-
-//     // If the user has closed the dialog before, don't show it again
-//     if (locationPromptClosed) {
-//       _isCheckingPermission = false;
-//       return;
-//     }
-
-//     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-//     if (!serviceEnabled) {
-//       // Show the location services dialog
-//       await _showLocationServicesDialog();
-//       _isCheckingPermission = false;
-//       return;
-//     }
-
-//     // Request location permission
-//     PermissionStatus permission = await Permission.location.request();
-//     if (permission.isGranted) {
-//       await _getCurrentLocation();
-//       // Reset the flag, because location is now enabled
-//       await prefs.setBool('LocationPromptClosed', false);
-//     }
-
-//     // Do nothing if permission is denied; no alert is shown
-//     _isCheckingPermission = false;
-//   }
-
-//   Future<void> _getCurrentLocation() async {
-//     // If a location fetch is already in progress, don't start a new one
-//     if (_isFetchingLocation) return;
-
-//     setState(() {
-//       _isFetchingLocation = true;
-//     });
-
-//   // if (_currentSelectedLocation != null ){
-//   //   setState(() {
-//   //     _currentSelectedLocation = null;
-//   //   });
-//   // }
-
-//     try {
-//       // Ensure location services are enabled and permission is granted before fetching location
-//       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-//       if (!serviceEnabled) {
-//         await _showLocationServicesDialog();
-//         return;
-//       }
-
-//       PermissionStatus permission = await Permission.location.status;
-//       if (permission.isDenied) {
-//         await _showPermissionDeniedDialog();
-//         return;
-//       } else if (permission.isPermanentlyDenied) {
-//         await _showPermanentlyDeniedDialog();
-//         return;
-//       }
-
-//       // Fetch the current location if permission is granted
-//       LatLng? currentLocation =
-//           await LocationService.instance.getCurrentLocation();
-//       print("_onMapCreated currentLocation $currentLocation");
-
-//       if (currentLocation != null) {
-//         // Update the current position
-//         setState(() {
-//           _currentPosition = currentLocation;
-//         });
-
-//         // Smoothly animate the camera to the new position if the mapController is available
-//         if (mapController != null) {
-//           await mapController!.animateCamera(
-//             CameraUpdate.newCameraPosition(
-//               CameraPosition(
-//                 target: _currentPosition!,
-//                 zoom: 18.0, // Adjust zoom level as needed
-//                 tilt: 45.0, // Add a tilt for a 3D effect
-//                 // bearing:
-//                 //     _previousBearing ?? 0, // Use previous bearing if available
-//               ),
-//             ),
-//           );
-//         }
-
-//         // Update the current location marker on the map
-//         _updateMarkers();
-//         fetchAllChargers();
-//         // await _updateCurrentLocationMarker(_previousBearing ?? 0);
-//       } else {
-//         print('Current location could not be determined.');
-//       }
-//     } catch (e) {
-//       print('Error occurred while fetching the current location: $e');
-//     } finally {
-//       setState(() {
-//         _isFetchingLocation = false;
-//       });
-//     }
-//   }
-
-// Future<void> _checkLocationPermission() async {
-//   if (_isCheckingPermission) return; // Prevent multiple permission checks
-
-//   _isCheckingPermission = true;
-
-//   // Load the saved flag from SharedPreferences
-//   SharedPreferences prefs = await SharedPreferences.getInstance();
-//   bool locationPromptClosed = prefs.getBool('LocationPromptClosed') ?? false;
-
-//   // If the user has closed the dialog before, don't show it again
-//   if (locationPromptClosed) {
-//     _isCheckingPermission = false;
-//     return;
-//   }
-
-//   // Check if location services are enabled
-//   bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-//   if (!serviceEnabled) {
-//     // Show the location services dialog
-//     await _showLocationServicesDialog();
-//     _isCheckingPermission = false;
-//     return;
-//   }
-//     print("Granted $_currentPosition");
-
-//   // Check the current location permission status
-//     PermissionStatus permission = await Permission.location.request();
-
-//   if (permission.isGranted) {
-//     print("Granted $_currentPosition");
-//     // Fetch the current location if permission is granted
-//     await _getCurrentLocation();
-//     await prefs.setBool('LocationPromptClosed', false); // Reset the flag
-//   } else if (permission.isDenied || permission.isRestricted) {
-//         print("not Granted $_currentPosition");
-
-//     // If the permission is denied or restricted, save the flag
-//     await prefs.setBool('LocationPromptClosed', true);
-//     await _showPermissionDeniedDialog(); // Show the dialog only when denied
-//   } else if (permission.isPermanentlyDenied) {
-//             print("not Granted isPermanentlyDenied $_currentPosition");
-
-//     // If permission is permanently denied, show a dialog to guide the user
-//     await _showPermanentlyDeniedDialog();
-//   }
-//     print("Granted $_currentPosition");
-
-//   _isCheckingPermission = false;
-// }
-
-// Future<void> _getCurrentLocation() async {
-//   // If a location fetch is already in progress, don't start a new one
-//   if (_isFetchingLocation) return;
-
-//   setState(() {
-//     _isFetchingLocation = true;
-//   });
-
-//   try {
-//     // Ensure location services are enabled before fetching location
-//     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-//     if (!serviceEnabled) {
-//       await _showLocationServicesDialog();
-//       return;
-//     }
-
-//     // Check the permission status again before fetching the location
-//     PermissionStatus permission = await Permission.locationWhenInUse.status;
-//     if (permission.isDenied || permission.isRestricted) {
-//       await _showPermissionDeniedDialog();
-//       return;
-//     } else if (permission.isPermanentlyDenied) {
-//       await _showPermanentlyDeniedDialog();
-//       return;
-//     }
-
-//     // Proceed with fetching the location
-//     LatLng? currentLocation = await LocationService.instance.getCurrentLocation();
-//     print("_onMapCreated currentLocation: $currentLocation");
-
-//     if (currentLocation != null) {
-//       // Update the current position
-//       setState(() {
-//         _currentPosition = currentLocation;
-//       });
-
-//       // Smoothly animate the camera to the new position if the mapController is available
-//       if (mapController != null) {
-//         await mapController!.animateCamera(
-//           CameraUpdate.newCameraPosition(
-//             CameraPosition(
-//               target: _currentPosition!,
-//               zoom: 18.0, // Adjust zoom level as needed
-//               tilt: 45.0, // Add a tilt for a 3D effect
-//             ),
-//           ),
-//         );
-//       }
-
-//       // Update the current location marker on the map
-//       _updateMarkers();
-//       fetchAllChargers();
-//     } else {
-//       print('Current location could not be determined.');
-//     }
-//   } catch (e) {
-//     print('Error occurred while fetching the current location: $e');
-//   } finally {
-//     setState(() {
-//       _isFetchingLocation = false;
-//     });
-//   }
-// }
 
   void _resetSelectedLocationAndFetchCurrent() {
     setState(() {
@@ -672,7 +442,6 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
       print("_onMapCreated _onMapCreated _currentPosition 2 $_currentPosition");
       print(
           "_onMapCreated _onMapCreated _currentSelectedLocation: 2 $_currentSelectedLocation");
-
       // Zoom to 100km radius around the current location
       _animateTo100kmRadius();
     } else {
@@ -903,14 +672,9 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
   }
 
   void _updateMarkers() async {
-    print("_updateMarkers: 1");
-    print("_updateMarkers: 1 $_currentPosition");
-    print("_updateMarkers: 1 $_currentSelectedLocation");
-    print("_updateMarkers Available Chargers:1 $availableChargers");
 
     // Use a set to track unique positions to avoid duplicate markers
     Set<String> uniquePositions = {};
-    print("_updateMarkers: 2");
 
     // Iterate through available chargers
     for (var charger in availableChargers) {
@@ -919,16 +683,13 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
           charger['lat'] != null ? double.tryParse(charger['lat']) : null;
       final lng =
           charger['long'] != null ? double.tryParse(charger['long']) : null;
-      print("_updateMarkers: 3");
 
       if (lat != null && lng != null) {
         // Create a unique key based on latitude and longitude
         String positionKey = '$lat,$lng';
-        print("_updateMarkers: 4");
 
         // Check if this position already exists
         if (uniquePositions.contains(positionKey)) {
-          print("_updateMarkers: 5");
 
           continue; // Skip adding a marker if this position is already tracked
         }
@@ -961,32 +722,9 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
             ),
           );
         });
-        print("_updateMarkers: 6");
       }
     }
 
-    if (_currentPosition != null || _currentSelectedLocation != null) {
-      // Fetch the dynamic bearing
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-      );
-      final double bearing = position.heading; // Get the current bearing
-
-      // Update the current location marker with the custom marker icon and bearing
-      final currentLocationIcon =
-          await _createCurrentLocationMarkerIcon(bearing);
-
-      setState(() {
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('current_location'),
-            position: _currentPosition!,
-            icon: currentLocationIcon,
-            infoWindow: const InfoWindow(title: 'Your Location'),
-          ),
-        );
-      });
-    }
   }
 
   Future<Map<String, dynamic>?> handleSearchRequest(
@@ -1006,7 +744,7 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
 
     try {
       final response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/searchCharger'),
+        Uri.parse('http://122.166.210.142:9098/searchCharger'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'searchChargerID': searchChargerID,
@@ -1074,7 +812,7 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
 
     try {
       final response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/updateConnectorUser'),
+        Uri.parse('http://122.166.210.142:9098/updateConnectorUser'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'searchChargerID': searchChargerID,
@@ -1222,7 +960,7 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
 
     try {
       final response = await http.post(
-        Uri.parse('http://122.166.210.142:4444/getRecentSessionDetails'),
+        Uri.parse('http://122.166.210.142:9098/getRecentSessionDetails'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'user_id': widget.userId,
@@ -1268,7 +1006,7 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
     try {
       final response = await http.post(
         Uri.parse(
-            'http://122.166.210.142:4444/getAllChargersWithStatusAndPrice'),
+            'http://122.166.210.142:9098/getAllChargersWithStatusAndPrice'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'user_id': widget.userId}),
       );
@@ -1529,7 +1267,7 @@ class _HomeContentState extends State<HomeContent> with WidgetsBindingObserver {
                 ),
                 markers: _markers,
                 zoomControlsEnabled: false,
-                myLocationEnabled: false,
+                myLocationEnabled: true,
                 myLocationButtonEnabled: false,
                 mapToolbarEnabled: false,
                 compassEnabled: false,

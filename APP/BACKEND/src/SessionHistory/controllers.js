@@ -1,5 +1,4 @@
 const database = require('../../db');
-const logger = require('../../logger');
 
 //SESSION HISTORY
 async function getChargingSessionDetails(req, res) {
@@ -22,7 +21,7 @@ async function getChargingSessionDetails(req, res) {
             const errorMessage = 'ChargingSessionDetails - No record found!';
             return res.status(404).json({ message: errorMessage });
         }
-
+        
         return res.status(200).json({ value: result });
     } catch (error) {
         console.error('Error fetching charging session details:', error);

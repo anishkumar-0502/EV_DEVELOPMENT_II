@@ -59,10 +59,10 @@ async function FetchWalletBalance(req, res) {
         const usersCollection = db.collection("users");
         
         // Query to fetch the user by user_id
-        const user = await usersCollection.findOne({ user_id: user_id, status: true });
+        const user = await usersCollection.findOne({ user_id: user_id });
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found or inactive' });
+            return res.status(404).json({ message: 'User not found' });
         }
 
         // return res.status(200).json({ status: 'Success', data: user.wallet_bal });
